@@ -38,9 +38,31 @@ class Pawn(ChessPiece):
                 valid_moves.append((new_x, new_y))
 
         # En passant (optional, can be implemented later)
-        # Pawn promotion (optional, can be implemented later)
+        
 
         return valid_moves
+    
+    # Pawn promotion
+    def promote(self, board):
+        """Promotes the pawn to a new piece."""
+        promotion_pieces = {
+            'q': Queen,
+            'r': Rook,
+            'b': Bishop,
+            'n': Knight,
+        }
+
+        print("Pawn promotion! Choose a piece to promote to:")
+        print("q - Queen, r - Rook, b - Bishop, n - Knight")
+        choice = input("Enter your choice: ").lower()
+
+        if choice in promotion_pieces:
+            new_piece = promotion_pieces[choice](choice.upper(), self.color, self.position)
+            board.place_piece(new_piece, self.position)
+        else:
+            print("Invalid choice. Promoting to Queen by default.")
+            new_piece = Queen(self.name, self.color, self.position)
+            board.place_piece(new_piece, self.position)
 
 
 class Rook(ChessPiece):
@@ -180,17 +202,24 @@ class Board:
         self.grid[x][y] = piece
 
     def move_piece(self, from_position, to_position):
-        """Moves a piece from one position to another if the move is valid."""
         from_x, from_y = from_position
         to_x, to_y = to_position
         piece = self.grid[from_x][from_y]
 
-        if piece and piece.color == self.current_turn and to_position in piece.get_valid_moves(self):
-            self.grid[to_x][to_y] = piece
-            self.grid[from_x][from_y] = None
-            piece.move(to_position)
-            self.current_turn = 'black' if self.current_turn == 'white' else 'white'  # Switch turns
-            return True
+        if piece and piece.color == self.current_turn:
+            valid_moves = piece.get_valid_moves(self)
+            if to_position in valid_moves:
+                # Move the piece
+                self.grid[to_x][to_y] = piece
+                self.grid[from_x][from_y] = None
+                piece.move(to_position)
+
+                # Check for pawn promotion
+                if isinstance(piece, Pawn) and (to_y == 0 or to_y == 7):
+                    piece.promote(self)
+
+                self.current_turn = 'black' if self.current_turn == 'white' else 'white'
+                return True
         return False
 
     def display(self):
