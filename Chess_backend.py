@@ -1,4 +1,3 @@
-# Base class for all chess pieces
 class ChessPiece:
     def __init__(self, name, color, position):
         self.name = name  # Name of the piece (e.g., "pawn", "rook")
@@ -6,35 +5,44 @@ class ChessPiece:
         self.position = position  # Current position of the piece as a tuple (x, y)
         self.move_count = 0  # Number of times the piece has moved
 
+    def get_valid_moves(self, board):
+        """Returns a list of valid moves for the piece based on the board state."""
+        raise NotImplementedError("Subclasses must implement this method")
+
     def move(self, new_position):
         """Updates the piece's position and increments move_count."""
         self.position = new_position
         self.move_count += 1
 
 
-# Pawn class inherits from ChessPiece
 class Pawn(ChessPiece):
     def get_valid_moves(self, board):
         valid_moves = []
-        direction = -1 if self.color == 'white' else 1  # Pawns move in opposite directions based on color
+        direction = -1 if self.color == 'white' else 1  # White moves up, black moves down
         x, y = self.position
 
         # Move forward
-        if board.is_empty((x, y + direction)):
-            valid_moves.append((x, y + direction))
+        new_y = y + direction
+        if board.is_within_bounds((x, new_y)) and board.is_empty((x, new_y)):
+            valid_moves.append((x, new_y))
             # Move two squares on first move
-            if self.move_count == 0 and board.is_empty((x, y + 2 * direction)):
-                valid_moves.append((x, y + 2 * direction))
+            if self.move_count == 0:
+                new_y2 = y + 2 * direction
+                if board.is_within_bounds((x, new_y2)) and board.is_empty((x, new_y2)):
+                    valid_moves.append((x, new_y2))
 
         # Capture diagonally
         for dx in [-1, 1]:
-            if board.is_enemy((x + dx, y + direction), self.color):
-                valid_moves.append((x + dx, y + direction))
+            new_x, new_y = x + dx, y + direction
+            if board.is_within_bounds((new_x, new_y)) and board.is_enemy((new_x, new_y), self.color):
+                valid_moves.append((new_x, new_y))
+
+        # En passant (optional, can be implemented later)
+        # Pawn promotion (optional, can be implemented later)
 
         return valid_moves
 
 
-# Rook class inherits from ChessPiece
 class Rook(ChessPiece):
     def get_valid_moves(self, board):
         valid_moves = []
@@ -57,7 +65,6 @@ class Rook(ChessPiece):
         return valid_moves
 
 
-# Knight class inherits from ChessPiece
 class Knight(ChessPiece):
     def get_valid_moves(self, board):
         valid_moves = []
@@ -80,7 +87,6 @@ class Knight(ChessPiece):
         return valid_moves
 
 
-# Bishop class inherits from ChessPiece
 class Bishop(ChessPiece):
     def get_valid_moves(self, board):
         valid_moves = []
@@ -103,7 +109,6 @@ class Bishop(ChessPiece):
         return valid_moves
 
 
-# Queen class inherits from ChessPiece
 class Queen(ChessPiece):
     def get_valid_moves(self, board):
         valid_moves = []
@@ -126,7 +131,6 @@ class Queen(ChessPiece):
         return valid_moves
 
 
-# King class inherits from ChessPiece
 class King(ChessPiece):
     def get_valid_moves(self, board):
         valid_moves = []
@@ -144,13 +148,15 @@ class King(ChessPiece):
             ):
                 valid_moves.append((new_x, new_y))
 
+        # Castling (optional, can be implemented later)
+
         return valid_moves
 
 
-# Board class to manage the chessboard and pieces
 class Board:
     def __init__(self):
-        self.grid = [[None for _ in range(8)] for _ in range(8)]  # 8x8 grid representing the board
+        self.grid = [[None for _ in range(8)] for _ in range(8)]  # 8x8 grid
+        self.current_turn = 'white'  # Track whose turn it is
 
     def is_empty(self, position):
         """Checks if a position on the board is empty."""
@@ -178,10 +184,12 @@ class Board:
         from_x, from_y = from_position
         to_x, to_y = to_position
         piece = self.grid[from_x][from_y]
-        if piece and to_position in piece.get_valid_moves(self):
+
+        if piece and piece.color == self.current_turn and to_position in piece.get_valid_moves(self):
             self.grid[to_x][to_y] = piece
             self.grid[from_x][from_y] = None
             piece.move(to_position)
+            self.current_turn = 'black' if self.current_turn == 'white' else 'white'  # Switch turns
             return True
         return False
 
@@ -192,15 +200,15 @@ class Board:
             for x in range(8):
                 piece = self.grid[x][y]
                 if piece:
-                    row.append(f"{piece.name[0].upper()}{piece.color[0]}")  # Display piece name and color
+                    row.append(f"{piece.name[0].upper()}{piece.color[0]}")
                 else:
-                    row.append("..")  # Display empty squares as ".."
+                    row.append("..")
             print(" ".join(row))
 
 
 # Initialize the board and place pieces
 board = Board()
-board.place_piece(Pawn("pawn", "white", (1, 1)), (1, 1))
+board.place_piece(Pawn("pawn", "white", (1, 2)), (1, 2))
 board.place_piece(Rook("rook", "white", (0, 0)), (0, 0))
 board.place_piece(Knight("knight", "white", (1, 0)), (1, 0))
 board.place_piece(Bishop("bishop", "white", (2, 0)), (2, 0))
@@ -212,17 +220,42 @@ board.place_piece(Pawn("pawn", "black", (1, 6)), (1, 6))
 # Simple text-based interface
 def play_game():
     while True:
+        print(f"{board.current_turn.capitalize()}'s turn")
         board.display()
-        move_from = input("Enter the piece's current position (x y): ").split()
-        move_to = input("Enter the new position (x y): ").split()
+        print("Enter positions as 'x y' (e.g., '1 1').")
 
-        if not move_from or not move_to:
-            print("Invalid input. Try again.")
+        # Get current position of the piece
+        move_from = input("Enter the piece's current position (x y): ").split()
+        if len(move_from) != 2:
+            print("Invalid input. Please enter two numbers.")
             continue
 
         from_pos = tuple(map(int, move_from))
-        to_pos = tuple(map(int, move_to))
+        if not board.is_within_bounds(from_pos):
+            print("Invalid position. Please enter values between 0 and 7.")
+            continue
 
+        piece = board.grid[from_pos[0]][from_pos[1]]
+        if not piece or piece.color != board.current_turn:
+            print("No valid piece at this position.")
+            continue
+
+        # Display valid moves for the selected piece
+        valid_moves = piece.get_valid_moves(board)
+        print(f"Valid moves for {piece.name} at {from_pos}: {valid_moves}")
+
+        # Get new position for the piece
+        move_to = input("Enter the new position (x y): ").split()
+        if len(move_to) != 2:
+            print("Invalid input. Please enter two numbers.")
+            continue
+
+        to_pos = tuple(map(int, move_to))
+        if not board.is_within_bounds(to_pos):
+            print("Invalid position. Please enter values between 0 and 7.")
+            continue
+
+        # Attempt to move the piece
         if board.move_piece(from_pos, to_pos):
             print("Move successful!")
         else:
