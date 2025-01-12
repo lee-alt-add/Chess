@@ -34,11 +34,15 @@ class Pawn(ChessPiece):
         # Capture diagonally
         for dx in [-1, 1]:
             new_x, new_y = x + dx, y + direction
-            if board.is_within_bounds((new_x, new_y)) and board.is_enemy((new_x, new_y), self.color):
-                valid_moves.append((new_x, new_y))
-
-        # En passant (optional, can be implemented later)
-        
+            if board.is_within_bounds((new_x, new_y)):
+                # Regular capture
+                if board.is_enemy((new_x, new_y), self.color):
+                    valid_moves.append((new_x, new_y))
+                # En passant
+                else:
+                    adjacent_pawn = board.grid[new_x][y]
+                    if isinstance(adjacent_pawn, Pawn) and adjacent_pawn.move_count == 1:
+                        valid_moves.append((new_x, new_y))
 
         return valid_moves
     
@@ -213,6 +217,15 @@ class Board:
                 self.grid[to_x][to_y] = piece
                 self.grid[from_x][from_y] = None
                 piece.move(to_position)
+
+                # Handle en passant capture
+                if isinstance(piece, Pawn) and abs(to_y - from_y) == 2:
+                    # Mark the pawn as eligible for en passant
+                    piece.move_count = 1  # Reset move count to indicate it just moved two squares
+                elif isinstance(piece, Pawn) and abs(to_x - from_x) == 1 and board.is_empty((to_x, to_y)):
+                    # Perform en passant capture
+                    captured_pawn_y = to_y - direction
+                    self.grid[to_x][captured_pawn_y] = None
 
                 # Check for pawn promotion
                 if isinstance(piece, Pawn) and (to_y == 0 or to_y == 7):
